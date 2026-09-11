@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify,send_from_directory
+from flask import Flask, render_template, request, jsonify
 from ultralytics import YOLO
 from werkzeug.utils import secure_filename
 import os
@@ -6,23 +6,37 @@ from datetime import datetime
 
 app = Flask(__name__)
 
+# =========================================================
+# UPLOAD CONFIGURATION
+# =========================================================
+
 UPLOAD_FOLDER = "uploads"
+
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+
 
 # =========================================================
 # YOLO MODEL
 # =========================================================
 
+# Model is loaded only when AI detection is requested.
+# This prevents the model from loading during normal startup.
+
 model = None
 
+
 def get_model():
+
     global model
 
     if model is None:
+
         print("Loading YOLO model...")
+
         model = YOLO("yolo11n.pt")
+
         print("YOLO model loaded successfully.")
 
     return model
@@ -33,6 +47,7 @@ def get_model():
 # =========================================================
 
 buses = [
+
     {
         "bus_id": "RJ14-1234",
         "route": "Jaipur → Ajmer",
@@ -65,6 +80,7 @@ buses = [
         "latitude": 26.9530,
         "longitude": 75.8470
     }
+
 ]
 
 
@@ -77,14 +93,12 @@ feedback_list = []
 
 # =========================================================
 # HISTORICAL PASSENGER DATA
-#
-# Prototype data used for demonstrating
-# demand prediction.
 # =========================================================
 
 historical_demand = {
 
     "Jaipur → Ajmer": {
+
         "8 AM": 42,
         "9 AM": 55,
         "10 AM": 38,
@@ -98,9 +112,11 @@ historical_demand = {
         "6 PM": 72,
         "7 PM": 68,
         "8 PM": 52
+
     },
 
     "Jaipur → Sanganer": {
+
         "8 AM": 48,
         "9 AM": 58,
         "10 AM": 45,
@@ -114,9 +130,11 @@ historical_demand = {
         "6 PM": 75,
         "7 PM": 70,
         "8 PM": 58
+
     },
 
     "Jaipur → Amer": {
+
         "8 AM": 30,
         "9 AM": 35,
         "10 AM": 40,
@@ -130,7 +148,9 @@ historical_demand = {
         "6 PM": 78,
         "7 PM": 74,
         "8 PM": 60
+
     }
+
 }
 
 
@@ -141,15 +161,19 @@ historical_demand = {
 def demand_status(passengers):
 
     if passengers <= 40:
+
         return "LOW"
 
     elif passengers <= 70:
+
         return "MODERATE"
 
     elif passengers <= 100:
+
         return "HIGH"
 
     else:
+
         return "VERY HIGH"
 
 
@@ -160,20 +184,25 @@ def demand_status(passengers):
 def crowd_status(passengers, capacity):
 
     if capacity <= 0:
+
         return "UNKNOWN"
 
     percentage = (passengers / capacity) * 100
 
     if percentage <= 40:
+
         return "LOW"
 
     elif percentage <= 70:
+
         return "MODERATE"
 
     elif percentage <= 100:
+
         return "HIGH"
 
     else:
+
         return "OVER-CAPACITY"
 
 
@@ -184,13 +213,17 @@ def crowd_status(passengers, capacity):
 def bus_information(bus):
 
     passengers = bus["passenger_count"]
+
     capacity = bus["capacity"]
 
     occupancy = (passengers / capacity) * 100
 
     data = bus.copy()
 
-    data["occupancy"] = round(occupancy, 1)
+    data["occupancy"] = round(
+        occupancy,
+        1
+    )
 
     data["crowd_status"] = crowd_status(
         passengers,
@@ -206,7 +239,10 @@ def bus_information(bus):
 
 @app.route("/")
 def home():
-    return render_template("index.html")
+
+    return render_template(
+        "index.html"
+    )
 
 
 # =========================================================
@@ -245,7 +281,10 @@ def recommend():
         ) * 100
 
         available.append(
-            (occupancy, bus)
+            (
+                occupancy,
+                bus
+            )
         )
 
     available.sort(
@@ -273,51 +312,103 @@ def detect():
 
     try:
 
+        # -------------------------------------------------
+        # CHECK IMAGE
+        # -------------------------------------------------
+
         if "crowd_image" not in request.files:
 
             return jsonify({
+
                 "success": False,
-                "message": "Please select an image."
+
+                "message":
+                    "Please select an image."
+
             })
 
         file = request.files["crowd_image"]
 
-        bus_id = request.form.get("bus_id")
+        # -------------------------------------------------
+        # GET BUS
+        # -------------------------------------------------
+
+        bus_id = request.form.get(
+            "bus_id"
+        )
 
         if file.filename == "":
 
             return jsonify({
+
                 "success": False,
-                "message": "Please select an image."
+
+                "message":
+                    "Please select an image."
+
             })
 
         if not bus_id:
 
             return jsonify({
+
                 "success": False,
-                "message": "Please select a bus."
+
+                "message":
+                    "Please select a bus."
+
             })
 
-        filename = secure_filename(file.filename)
+        # -------------------------------------------------
+        # SAVE IMAGE
+        # -------------------------------------------------
+
+        filename = secure_filename(
+            file.filename
+        )
 
         filepath = os.path.join(
+
             app.config["UPLOAD_FOLDER"],
+
             filename
+
         )
 
         file.save(filepath)
 
-        # Load YOLO only when detection is requested
+        print("Image saved:", filepath)
+
+        # -------------------------------------------------
+        # LOAD YOLO MODEL
+        # -------------------------------------------------
+
         yolo_model = get_model()
 
-        # Run YOLO on CPU
+        # -------------------------------------------------
+        # RUN YOLO ON CPU
+        # Smaller image size reduces memory usage.
+        # -------------------------------------------------
+
         results = yolo_model.predict(
+
             source=filepath,
+
             conf=0.35,
+
             imgsz=320,
+
             device="cpu",
+
             verbose=False
+
         )
+
+        # -------------------------------------------------
+        # COUNT PERSONS
+        #
+        # YOLO class 0 = person
+        # -------------------------------------------------
 
         passenger_count = 0
 
@@ -331,7 +422,13 @@ def detect():
 
                         passenger_count += 1
 
-        # Find selected bus
+        # Release prediction results
+        del results
+
+        # -------------------------------------------------
+        # FIND SELECTED BUS
+        # -------------------------------------------------
+
         selected_bus = None
 
         for bus in buses:
@@ -345,22 +442,38 @@ def detect():
         if selected_bus is None:
 
             return jsonify({
+
                 "success": False,
-                "message": "Selected bus not found."
+
+                "message":
+                    "Selected bus not found."
+
             })
 
-        # Update passenger count
-        selected_bus["passenger_count"] = passenger_count
+        # -------------------------------------------------
+        # UPDATE PASSENGER COUNT
+        # -------------------------------------------------
+
+        selected_bus["passenger_count"] = (
+            passenger_count
+        )
 
         information = bus_information(
             selected_bus
         )
 
+        # -------------------------------------------------
+        # PRINT AI RESULT
+        # -------------------------------------------------
+
         print()
         print("--------------------------------")
         print("JANyatra AI Passenger Detection")
         print("--------------------------------")
-        print("Bus:", bus_id)
+        print(
+            "Bus:",
+            bus_id
+        )
         print(
             "Passengers detected:",
             passenger_count
@@ -381,8 +494,9 @@ def detect():
         print("--------------------------------")
         print()
 
-        # Release prediction results
-        del results
+        # -------------------------------------------------
+        # RETURN RESULT
+        # -------------------------------------------------
 
         return jsonify({
 
@@ -424,6 +538,7 @@ def detect():
                 + str(error)
 
         }), 500
+
 
 # =========================================================
 # BUS LOCATION
@@ -488,9 +603,7 @@ def update():
 
             if bus["bus_id"] == bus_id:
 
-                bus[
-                    "passenger_count"
-                ] = max(
+                bus["passenger_count"] = max(
                     0,
                     passenger_count
                 )
@@ -647,7 +760,8 @@ def sos():
             "success": False,
 
             "message":
-                "SOS error: " + str(error)
+                "SOS error: "
+                + str(error)
 
         }), 500
 
@@ -872,19 +986,16 @@ def demand_prediction():
 
         }), 404
 
-
     # -----------------------------------------------------
-    # Prototype prediction method:
-    # average of the latest three historical values
+    # Prototype prediction:
+    # Average of latest three historical values
     # -----------------------------------------------------
 
     values = list(
         data.values()
     )
 
-
     recent_values = values[-3:]
-
 
     predicted = sum(
         recent_values
@@ -892,16 +1003,13 @@ def demand_prediction():
         recent_values
     )
 
-
     predicted = round(
         predicted
     )
 
-
     status = demand_status(
         predicted
     )
-
 
     if predicted <= 40:
 
@@ -930,7 +1038,6 @@ def demand_prediction():
             "Very high demand expected. "
             "Additional buses may be required."
         )
-
 
     return jsonify({
 
@@ -978,7 +1085,7 @@ if __name__ == "__main__":
     print()
 
     app.run(
-        host="127.0.0.1",
+        host="0.0.0.0",
         port=5000,
-        debug=True
+        debug=False
     )
