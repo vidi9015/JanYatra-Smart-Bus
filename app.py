@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify,send_from_directory
 from ultralytics import YOLO
 from werkzeug.utils import secure_filename
 import os
@@ -196,8 +196,10 @@ def bus_information(bus):
 
 @app.route("/")
 def home():
-
-    return render_template("index.html")
+    return send_from_directory(
+        os.path.join(app.root_path,"templates"),
+        "index.html"
+    )
 
 
 # =========================================================
