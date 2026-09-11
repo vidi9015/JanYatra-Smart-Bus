@@ -314,7 +314,7 @@ def detect():
         results = yolo_model.predict(
             source=filepath,
             conf=0.35,
-            imgsz=640,
+            imgsz=320,
             device="cpu",
             verbose=False
         )
