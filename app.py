@@ -15,7 +15,17 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 # YOLO MODEL
 # =========================================================
 
-model = YOLO("yolo11n.pt")
+model = None
+
+def get_model():
+    global model
+
+    if model is None:
+        print("Loading YOLO model...")
+        model = YOLO("yolo11n.pt")
+        print("YOLO model loaded successfully.")
+
+    return model
 
 
 # =========================================================
@@ -304,10 +314,15 @@ def detect():
 
         file.save(filepath)
 
-        results = model(
-            filepath,
-            conf=0.35
-        )
+       yolo_model = get_model()
+
+results = yolo_model.predict(
+    source=filepath,
+    conf=0.35,
+    imgsz=640,
+    device="cpu",
+    verbose=False
+)
 
         passenger_count = 0
 
@@ -320,6 +335,7 @@ def detect():
                     if int(cls) == 0:
 
                         passenger_count += 1
+         del results
 
         selected_bus = None
 
