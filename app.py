@@ -196,10 +196,7 @@ def bus_information(bus):
 
 @app.route("/")
 def home():
-    return send_from_directory(
-        os.path.join(app.root_path,"templates"),
-        "index.html"
-    )
+    return render_template("index.html")
 
 
 # =========================================================
