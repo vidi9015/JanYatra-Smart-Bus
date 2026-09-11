@@ -277,35 +277,28 @@ def detect():
 
             return jsonify({
                 "success": False,
-                "message":
-                    "Please select an image."
+                "message": "Please select an image."
             })
 
         file = request.files["crowd_image"]
 
-        bus_id = request.form.get(
-            "bus_id"
-        )
+        bus_id = request.form.get("bus_id")
 
         if file.filename == "":
 
             return jsonify({
                 "success": False,
-                "message":
-                    "Please select an image."
+                "message": "Please select an image."
             })
 
         if not bus_id:
 
             return jsonify({
                 "success": False,
-                "message":
-                    "Please select a bus."
+                "message": "Please select a bus."
             })
 
-        filename = secure_filename(
-            file.filename
-        )
+        filename = secure_filename(file.filename)
 
         filepath = os.path.join(
             app.config["UPLOAD_FOLDER"],
@@ -314,15 +307,17 @@ def detect():
 
         file.save(filepath)
 
-       yolo_model = get_model()
+        # Load YOLO only when detection is requested
+        yolo_model = get_model()
 
-results = yolo_model.predict(
-    source=filepath,
-    conf=0.35,
-    imgsz=640,
-    device="cpu",
-    verbose=False
-)
+        # Run YOLO on CPU
+        results = yolo_model.predict(
+            source=filepath,
+            conf=0.35,
+            imgsz=640,
+            device="cpu",
+            verbose=False
+        )
 
         passenger_count = 0
 
@@ -335,8 +330,8 @@ results = yolo_model.predict(
                     if int(cls) == 0:
 
                         passenger_count += 1
-         del results
 
+        # Find selected bus
         selected_bus = None
 
         for bus in buses:
@@ -350,17 +345,12 @@ results = yolo_model.predict(
         if selected_bus is None:
 
             return jsonify({
-
                 "success": False,
-
-                "message":
-                    "Selected bus not found."
-
+                "message": "Selected bus not found."
             })
 
-        selected_bus[
-            "passenger_count"
-        ] = passenger_count
+        # Update passenger count
+        selected_bus["passenger_count"] = passenger_count
 
         information = bus_information(
             selected_bus
@@ -370,10 +360,7 @@ results = yolo_model.predict(
         print("--------------------------------")
         print("JANyatra AI Passenger Detection")
         print("--------------------------------")
-        print(
-            "Bus:",
-            bus_id
-        )
+        print("Bus:", bus_id)
         print(
             "Passengers detected:",
             passenger_count
@@ -393,6 +380,9 @@ results = yolo_model.predict(
         )
         print("--------------------------------")
         print()
+
+        # Release prediction results
+        del results
 
         return jsonify({
 
@@ -434,7 +424,6 @@ results = yolo_model.predict(
                 + str(error)
 
         }), 500
-
 
 # =========================================================
 # BUS LOCATION
