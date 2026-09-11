@@ -400,6 +400,8 @@ def detect():
 
             device="cpu",
 
+            fuse=False,
+
             verbose=False
 
         )
