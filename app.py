@@ -394,7 +394,7 @@ def detect():
 
             source=filepath,
 
-            conf=0.35,
+            conf=0.25,
 
             imgsz=320,
 
