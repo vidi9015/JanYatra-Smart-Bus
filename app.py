@@ -396,11 +396,13 @@ def detect():
 
             conf=0.25,
 
-            imgsz=320,
+            imgsz=256,
 
             device="cpu",
 
-            verbose=False
+            verbose=False,
+
+            stream=True
 
         )
 
@@ -421,9 +423,6 @@ def detect():
                     if int(cls) == 0:
 
                         passenger_count += 1
-
-        # Release prediction results
-        del results
 
         # -------------------------------------------------
         # FIND SELECTED BUS
